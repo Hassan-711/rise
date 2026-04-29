@@ -333,3 +333,28 @@ export async function uploadMaterialFile(file: File, userId: string, subjectId: 
   const { data } = supabase.storage.from('study-materials').getPublicUrl(path)
   return { url: data.publicUrl, error: null }
 }
+
+// ─── DELETE CAREER GOAL ───────────────────────────────────────────────────────
+export async function deleteCareerGoal(id: string) {
+  const { data: { user } } = await db().auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+  // Milestones cascade-delete via FK (ON DELETE CASCADE in schema)
+  const { error } = await db()
+    .from('career_goals')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user.id)
+  return { error: error?.message }
+}
+
+// ─── DELETE MILESTONE ─────────────────────────────────────────────────────────
+export async function deleteMilestone(id: string) {
+  const { data: { user } } = await db().auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+  const { error } = await db()
+    .from('career_milestones')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user.id)
+  return { error: error?.message }
+}
