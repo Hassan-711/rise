@@ -150,7 +150,7 @@ export default function ResumePage() {
                   <h2 className="text-xl font-bold">{(profile.full_name as string) || 'Your Name'}</h2>
                   <p className="text-sm text-primary font-medium">{(profile.career_goal as string) || 'AI-Powered Backend Engineer'}</p>
                 </div>
-                {profile.cgpa && <Badge variant="success">{profile.cgpa as string} CGPA</Badge>}
+                {profile.cgpa && <Badge variant="success">{String(profile.cgpa)} CGPA</Badge>}
               </div>
               <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
                 {profile.email && <span className="flex items-center gap-1">✉ {profile.email as string}</span>}
