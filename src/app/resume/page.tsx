@@ -7,11 +7,11 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
-import { FileText, User, Code2, Award, Briefcase, GitBranch, ExternalLink, Plus, Edit3, Download, Eye, Github, Linkedin, Save, Trash2, X, Loader2 } from 'lucide-react'
-import { cn, generateInitials, getPriorityColor } from '@/lib/utils'
+import { FileText, User, Code2, Award, Briefcase, GitBranch, ExternalLink, Plus, Edit3, Download, Github, Linkedin, Trash2, Loader2 } from 'lucide-react'
+import { cn, generateInitials } from '@/lib/utils'
 import { toast } from '@/components/ui/toaster'
 import { getProfile, updateProfile, getSkills, addSkill, updateSkill, deleteSkill, getProjects, addProject, deleteProject, getCertifications, addCertification, deleteCertification, getWorkExperience, addWorkExperience, deleteWorkExperience } from '@/lib/db'
-import type { Skill, Project, Certification, WorkExperience } from '@/lib/types'
+import type { Profile, Skill, Project, Certification, WorkExperience } from '@/lib/types'
 
 const SKILL_CATEGORIES = ['language', 'framework', 'database', 'tool', 'soft', 'cloud'] as const
 const CATEGORY_LABELS: Record<string, string> = { language: 'Languages', framework: 'Frameworks', database: 'Databases', tool: 'Tools', soft: 'Soft Skills', cloud: 'Cloud' }
@@ -19,11 +19,21 @@ const CATEGORY_COLORS: Record<string, string> = { language: 'text-blue-400 bg-bl
 
 type Tab = 'overview' | 'skills' | 'projects' | 'certifications' | 'experience' | 'preview'
 
+// Empty profile with all fields typed
+const EMPTY_PROFILE: Profile = {
+  id: '', full_name: null, email: null, bio: null, avatar_url: null,
+  university: null, degree: null, enrollment_no: null, current_semester: null,
+  cgpa: null, career_goal: null, linkedin_url: null, github_url: null,
+  portfolio_url: null, created_at: '', updated_at: '',
+}
+
 export default function ResumePage() {
   const [tab, setTab] = useState<Tab>('overview')
   const [loading, setLoading] = useState(true)
-  const [profile, setProfile] = useState<Record<string, unknown>>({})
-  const [bio, setBio] = useState(''); const [editBio, setEditBio] = useState(false); const [savingBio, setSavingBio] = useState(false)
+  const [profile, setProfile] = useState<Profile>(EMPTY_PROFILE)
+  const [bio, setBio] = useState('')
+  const [editBio, setEditBio] = useState(false)
+  const [savingBio, setSavingBio] = useState(false)
   const [skills, setSkills] = useState<Skill[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [certs, setCerts] = useState<Certification[]>([])
@@ -42,8 +52,15 @@ export default function ResumePage() {
 
   useEffect(() => {
     Promise.all([getProfile(), getSkills(), getProjects(), getCertifications(), getWorkExperience()]).then(([p, s, pr, c, e]) => {
-      if (p) { setProfile(p as Record<string, unknown>); setBio((p as Record<string, unknown>).bio as string ?? '') }
-      setSkills(s as Skill[]); setProjects(pr as Project[]); setCerts(c as Certification[]); setExperience(e as WorkExperience[])
+      if (p) {
+        const typedProfile = p as Profile
+        setProfile(typedProfile)
+        setBio(typedProfile.bio ?? '')
+      }
+      setSkills(s as Skill[])
+      setProjects(pr as Project[])
+      setCerts(c as Certification[])
+      setExperience(e as WorkExperience[])
       setLoading(false)
     })
   }, [])
@@ -142,21 +159,21 @@ export default function ResumePage() {
         <CardContent className="p-6">
           <div className="flex items-start gap-4">
             <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary/20 border-2 border-primary/30 text-2xl font-bold text-primary">
-              {generateInitials(profile.full_name as string)}
+              {generateInitials(profile.full_name)}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <h2 className="text-xl font-bold">{(profile.full_name as string) || 'Your Name'}</h2>
-                  <p className="text-sm text-primary font-medium">{(profile.career_goal as string) || 'AI-Powered Backend Engineer'}</p>
+                  <h2 className="text-xl font-bold">{profile.full_name || 'Your Name'}</h2>
+                  <p className="text-sm text-primary font-medium">{profile.career_goal || 'Career Goal'}</p>
                 </div>
-                {profile.cgpa && <Badge variant="success">{String(profile.cgpa)} CGPA</Badge>}
+                {profile.cgpa && <Badge variant="success">{profile.cgpa} CGPA</Badge>}
               </div>
               <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                {profile.email && <span className="flex items-center gap-1">✉ {profile.email as string}</span>}
-                {profile.university && <span>🎓 {profile.university as string}</span>}
-                {profile.github_url && <span className="flex items-center gap-1"><Github className="h-3 w-3" />{profile.github_url as string}</span>}
-                {profile.linkedin_url && <span className="flex items-center gap-1"><Linkedin className="h-3 w-3" />{profile.linkedin_url as string}</span>}
+                {profile.email && <span className="flex items-center gap-1">✉ {profile.email}</span>}
+                {profile.university && <span>🎓 {profile.university}</span>}
+                {profile.github_url && <span className="flex items-center gap-1"><Github className="h-3 w-3" />{profile.github_url}</span>}
+                {profile.linkedin_url && <span className="flex items-center gap-1"><Linkedin className="h-3 w-3" />{profile.linkedin_url}</span>}
               </div>
               {!profile.full_name && <p className="text-xs text-amber-400 mt-2">⚠ Update your profile in Settings to see your info here</p>}
             </div>
@@ -418,17 +435,17 @@ export default function ResumePage() {
         <Card className="animate-fade-in">
           <CardContent className="p-8 font-sans max-w-3xl mx-auto">
             <div className="text-center border-b border-border pb-4 mb-4">
-              <h1 className="text-2xl font-bold">{(profile.full_name as string) || 'Your Name'}</h1>
-              <p className="text-sm text-primary font-medium mt-0.5">{(profile.career_goal as string) || 'AI-Powered Backend Engineer'}</p>
+              <h1 className="text-2xl font-bold">{profile.full_name || 'Your Name'}</h1>
+              <p className="text-sm text-primary font-medium mt-0.5">{profile.career_goal || 'Career Goal'}</p>
               <div className="flex justify-center flex-wrap gap-4 mt-2 text-xs text-muted-foreground">
-                {profile.email && <span>{profile.email as string}</span>}
-                {profile.github_url && <span>{profile.github_url as string}</span>}
-                {profile.linkedin_url && <span>{profile.linkedin_url as string}</span>}
+                {profile.email && <span>{profile.email}</span>}
+                {profile.github_url && <span>{profile.github_url}</span>}
+                {profile.linkedin_url && <span>{profile.linkedin_url}</span>}
               </div>
             </div>
             {bio && <div className="mb-4"><h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-1 mb-2">Summary</h2><p className="text-sm leading-relaxed">{bio}</p></div>}
             {profile.university && <div className="mb-4"><h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-1 mb-2">Education</h2>
-              <div className="flex justify-between"><div><p className="text-sm font-semibold">{profile.degree as string}</p><p className="text-xs text-muted-foreground">{profile.university as string}</p></div><div className="text-right text-xs text-muted-foreground"><p>2023 – 2027</p><p className="font-semibold text-foreground">CGPA: {profile.cgpa as string}</p></div></div></div>}
+              <div className="flex justify-between"><div><p className="text-sm font-semibold">{profile.degree}</p><p className="text-xs text-muted-foreground">{profile.university}</p></div><div className="text-right text-xs text-muted-foreground"><p>2023 – 2027</p>{profile.cgpa && <p className="font-semibold text-foreground">CGPA: {profile.cgpa}</p>}</div></div></div>}
             {skills.length > 0 && <div className="mb-4"><h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-1 mb-2">Technical Skills</h2>
               <div className="grid grid-cols-2 gap-1 text-xs">
                 {SKILL_CATEGORIES.filter(c => groupedSkills[c]?.length).map(c => <p key={c}><strong>{CATEGORY_LABELS[c]}:</strong> {groupedSkills[c].map(s => s.name).join(', ')}</p>)}

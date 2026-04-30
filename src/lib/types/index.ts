@@ -105,7 +105,7 @@ export type SyllabusTopic = {
 
 export type Subject = {
   id: string
-  semester_id: string
+  semester_id: string | null
   user_id: string
   name: string
   code: string | null
@@ -115,6 +115,7 @@ export type Subject = {
   exam_date: string | null
   syllabus_topics: SyllabusTopic[]
   color: string
+  status: 'current' | 'completed' | 'archived'
   created_at: string
   study_materials?: StudyMaterial[]
 }
