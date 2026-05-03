@@ -1,13 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Progress } from '@/components/ui/progress'
-import { FileText, User, Code2, Award, Briefcase, GitBranch, ExternalLink, Plus, Edit3, Download, Github, Linkedin, Trash2, Loader2 } from 'lucide-react'
+import { FileText, User, Code2, Award, Briefcase, GitBranch, ExternalLink, Plus, Edit3, Download, Github, Linkedin, Trash2, Loader2, CheckCircle2 } from 'lucide-react'
 import { cn, generateInitials } from '@/lib/utils'
 import { toast } from '@/components/ui/toaster'
 import { getProfile, updateProfile, getSkills, addSkill, updateSkill, deleteSkill, getProjects, addProject, deleteProject, getCertifications, addCertification, deleteCertification, getWorkExperience, addWorkExperience, deleteWorkExperience } from '@/lib/db'
@@ -15,7 +13,7 @@ import type { Profile, Skill, Project, Certification, WorkExperience } from '@/l
 
 const SKILL_CATEGORIES = ['language', 'framework', 'database', 'tool', 'soft', 'cloud'] as const
 const CATEGORY_LABELS: Record<string, string> = { language: 'Languages', framework: 'Frameworks', database: 'Databases', tool: 'Tools', soft: 'Soft Skills', cloud: 'Cloud' }
-const CATEGORY_COLORS: Record<string, string> = { language: 'text-blue-400 bg-blue-400/10', framework: 'text-violet-400 bg-violet-400/10', database: 'text-emerald-400 bg-emerald-400/10', tool: 'text-amber-400 bg-amber-400/10', soft: 'text-rose-400 bg-rose-400/10', cloud: 'text-cyan-400 bg-cyan-400/10' }
+const CATEGORY_COLORS: Record<string, string> = { language: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20', framework: 'text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-500/10 border-violet-200 dark:border-violet-500/20', database: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20', tool: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20', soft: 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/20', cloud: 'text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-500/10 border-cyan-200 dark:border-cyan-500/20' }
 
 type Tab = 'overview' | 'skills' | 'projects' | 'certifications' | 'experience' | 'preview'
 
@@ -34,6 +32,11 @@ export default function ResumePage() {
   const [bio, setBio] = useState('')
   const [editBio, setEditBio] = useState(false)
   const [savingBio, setSavingBio] = useState(false)
+  
+  // States for Editable Title (Career Goal)
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [tempTitle, setTempTitle] = useState('')
+
   const [skills, setSkills] = useState<Skill[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [certs, setCerts] = useState<Certification[]>([])
@@ -56,6 +59,7 @@ export default function ResumePage() {
         const typedProfile = p as Profile
         setProfile(typedProfile)
         setBio(typedProfile.bio ?? '')
+        setTempTitle(typedProfile.career_goal ?? '')
       }
       setSkills(s as Skill[])
       setProjects(pr as Project[])
@@ -64,6 +68,40 @@ export default function ResumePage() {
       setLoading(false)
     })
   }, [])
+
+  // ── SAVE TITLE (Career Goal) ──
+  async function saveTitle() {
+    setIsEditingTitle(false)
+    if (tempTitle.trim() === profile.career_goal) return
+    
+    // Update local state immediately
+    setProfile(p => ({ ...p, career_goal: tempTitle.trim() }))
+    
+    // Update DB
+    const { error } = await updateProfile({ career_goal: tempTitle.trim(), updated_at: new Date().toISOString() })
+    if (error) {
+      toast({ title: 'Failed to update title', variant: 'destructive' })
+      // Revert if error
+      setTempTitle(profile.career_goal ?? '')
+      setProfile(p => ({ ...p, career_goal: profile.career_goal }))
+    } else {
+      toast({ title: 'Title updated ✅' })
+    }
+  }
+
+  // ── EXPORT PDF LOGIC ──
+  function handleExportPDF() {
+    // We switch to preview tab to ensure content is rendered before printing
+    if (tab !== 'preview') {
+      setTab('preview')
+      // Small timeout to allow DOM to render the preview tab before calling print
+      setTimeout(() => {
+        window.print()
+      }, 300)
+    } else {
+      window.print()
+    }
+  }
 
   async function saveBio() {
     setSavingBio(true)
@@ -145,317 +183,493 @@ export default function ResumePage() {
     { key: 'experience', label: `Experience (${experience.length})` }, { key: 'preview', label: 'ATS Preview' },
   ]
 
-  if (loading) return <div className="space-y-4">{[1,2,3,4].map(i => <div key={i} className="h-20 rounded-xl bg-secondary/50 animate-pulse" />)}</div>
+  if (loading) {
+    return (
+      <div className="space-y-8 w-full max-w-[1800px] mx-auto">
+        <div className="h-9 w-72 shimmer rounded-xl" />
+        <div className="h-40 rounded-[2rem] shimmer" />
+        <div className="h-14 rounded-2xl shimmer w-full" />
+        <div className="h-96 rounded-[2rem] shimmer w-full" />
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div><h1 className="text-2xl font-bold">Resume Dashboard</h1><p className="text-muted-foreground text-sm mt-1">All data saved to your Supabase profile</p></div>
-        <Button onClick={() => toast({ title: 'PDF export — add Puppeteer in production' })} className="gap-2"><Download className="h-4 w-4" />Export PDF</Button>
+    <div className="space-y-8 w-full max-w-[1800px] mx-auto animate-slide-in">
+      
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 relative no-print">
+        <div className="relative">
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-800 dark:text-slate-100">
+            Resume Dashboard 📄
+          </h1>
+          <p className="text-sm font-bold text-slate-500 dark:text-slate-400 mt-2">
+            Manage your professional profile and generate ATS-friendly PDFs
+          </p>
+        </div>
+        <Button onClick={handleExportPDF} className="relative gap-2 shadow-[0_8px_20px_rgba(79,70,229,0.3)] hover:shadow-[0_12px_25px_rgba(79,70,229,0.4)] hover:-translate-y-0.5 transition-all bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-5 px-6 font-bold">
+          <Download className="h-4 w-4" strokeWidth={3} /> Export PDF
+        </Button>
       </div>
 
-      {/* Profile card */}
-      <Card className="gradient-border overflow-hidden">
-        <CardContent className="p-6">
-          <div className="flex items-start gap-4">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary/20 border-2 border-primary/30 text-2xl font-bold text-primary">
-              {generateInitials(profile.full_name)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h2 className="text-xl font-bold">{profile.full_name || 'Your Name'}</h2>
-                  <p className="text-sm text-primary font-medium">{profile.career_goal || 'Career Goal'}</p>
-                </div>
-                {profile.cgpa && <Badge variant="success">{profile.cgpa} CGPA</Badge>}
+      {/* Profile Card */}
+      <div className="glass-card p-6 md:p-8 flex flex-col md:flex-row gap-6 items-start md:items-center relative overflow-hidden no-print">
+        <div className="absolute -right-10 -top-10 w-40 h-40 bg-indigo-400/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 border-2 border-indigo-200 dark:border-indigo-500/20 text-3xl font-black text-indigo-600 dark:text-indigo-400 shadow-inner">
+          {generateInitials(profile.full_name)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">{profile.full_name || 'Your Name'}</h2>
+              
+              {/* ── Editable Title Logic ── */}
+              <div className="mt-1">
+                {isEditingTitle ? (
+                  <Input 
+                    autoFocus
+                    value={tempTitle}
+                    onChange={(e) => setTempTitle(e.target.value)}
+                    onBlur={saveTitle}
+                    onKeyDown={(e) => e.key === 'Enter' && saveTitle()}
+                    className="h-7 text-sm font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest bg-white/50 dark:bg-white/5 border-indigo-200 dark:border-indigo-500/30 w-full max-w-sm px-2"
+                  />
+                ) : (
+                  <p 
+                    onClick={() => setIsEditingTitle(true)}
+                    className="text-sm font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-2 group"
+                  >
+                    {profile.career_goal ? profile.career_goal : <span className="opacity-50 border-b border-dashed border-indigo-400/50">Add Professional Title (e.g. Software Engineer)...</span>}
+                    <Edit3 className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </p>
+                )}
               </div>
-              <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                {profile.email && <span className="flex items-center gap-1">✉ {profile.email}</span>}
-                {profile.university && <span>🎓 {profile.university}</span>}
-                {profile.github_url && <span className="flex items-center gap-1"><Github className="h-3 w-3" />{profile.github_url}</span>}
-                {profile.linkedin_url && <span className="flex items-center gap-1"><Linkedin className="h-3 w-3" />{profile.linkedin_url}</span>}
-              </div>
-              {!profile.full_name && <p className="text-xs text-amber-400 mt-2">⚠ Update your profile in Settings to see your info here</p>}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Tab nav */}
-      <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
+            </div>
+            {profile.cgpa && (
+              <Badge className="px-3 py-1.5 text-sm font-black bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30 shadow-sm rounded-xl">
+                {profile.cgpa} CGPA
+              </Badge>
+            )}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-4 text-[13px] font-bold text-slate-500 dark:text-slate-400">
+            {profile.email && <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600"/> {profile.email}</span>}
+            {profile.university && <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600"/> {profile.university}</span>}
+            {profile.github_url && <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-indigo-500 cursor-pointer"><Github className="h-4 w-4" /> {profile.github_url}</span>}
+            {profile.linkedin_url && <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-indigo-500 cursor-pointer"><Linkedin className="h-4 w-4" /> {profile.linkedin_url}</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Tab Nav */}
+      <div className="flex gap-2 p-2 rounded-2xl bg-white/40 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 overflow-x-auto scrollbar-hide shadow-sm backdrop-blur-md no-print">
         {TABS.map(({ key, label }) => (
           <button key={key} onClick={() => setTab(key)}
-            className={cn('flex-shrink-0 px-4 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all',
-              tab === key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-secondary')}>
+            className={cn('flex-shrink-0 px-5 py-2.5 rounded-xl text-[13px] font-extrabold tracking-wide whitespace-nowrap transition-all duration-300',
+              tab === key ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-md border border-slate-200/50 dark:border-white/10' : 'text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-white/10 border border-transparent hover:text-slate-700 dark:hover:text-slate-200')}>
             {label}
           </button>
         ))}
       </div>
 
+      {/* ── TAB CONTENTS ── */}
+
       {/* OVERVIEW */}
       {tab === 'overview' && (
-        <Card className="animate-fade-in">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2"><User className="h-4 w-4 text-primary" />Professional Summary</CardTitle>
-              <Button variant="ghost" size="icon-sm" onClick={() => setEditBio(!editBio)}><Edit3 className="h-3.5 w-3.5" /></Button>
+        <div className="glass-card p-6 md:p-8 animate-fade-in flex flex-col gap-6 no-print">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-200/60 dark:border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl icon-violet shadow-sm">
+                <User className="h-5 w-5" />
+              </div>
+              <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">Professional Summary</h2>
             </div>
-          </CardHeader>
-          <CardContent>
+            <Button variant="ghost" size="icon" onClick={() => setEditBio(!editBio)} className="rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/10 text-slate-500">
+              <Edit3 className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          <div className="pt-2">
             {editBio ? (
-              <div className="space-y-3">
-                <textarea className="w-full min-h-[100px] rounded-lg border border-input bg-background/50 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring/50"
-                  value={bio} onChange={e => setBio(e.target.value)} placeholder="Write your professional summary..." />
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={saveBio} disabled={savingBio}>{savingBio ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}Save</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setEditBio(false)}>Cancel</Button>
+              <div className="space-y-4 animate-fade-in">
+                <textarea className="w-full min-h-[150px] rounded-xl border-2 border-indigo-100 dark:border-indigo-500/20 bg-white/50 dark:bg-white/5 px-4 py-4 text-[15px] font-medium text-slate-700 dark:text-slate-200 resize-none focus:outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-400/10 transition-all shadow-inner"
+                  value={bio} onChange={e => setBio(e.target.value)} placeholder="Write a compelling summary about your career, goals, and passions..." />
+                <div className="flex gap-3">
+                  <Button onClick={saveBio} disabled={savingBio} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 shadow-md">
+                    {savingBio ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Save Summary
+                  </Button>
+                  <Button variant="ghost" onClick={() => setEditBio(false)} className="rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 font-bold text-slate-500">Cancel</Button>
                 </div>
               </div>
-            ) : bio ? <p className="text-sm text-muted-foreground leading-relaxed">{bio}</p>
-            : <p className="text-sm text-muted-foreground italic">Click the edit icon to add your professional summary...</p>}
-          </CardContent>
-        </Card>
+            ) : bio ? (
+              <p className="text-[15px] font-medium text-slate-600 dark:text-slate-300 leading-relaxed max-w-4xl">{bio}</p>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                <FileText className="h-12 w-12 mb-4 opacity-20" />
+                <p className="text-[15px] font-bold">No summary added yet.</p>
+                <p className="text-sm font-semibold opacity-70 mt-1">Click the edit button above to write your professional summary.</p>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* SKILLS */}
       {tab === 'skills' && (
-        <div className="space-y-4 animate-fade-in">
+        <div className="space-y-6 animate-fade-in no-print">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">{skills.length} skills</p>
-            <Button size="sm" variant="outline" className="gap-2" onClick={() => setShowAddSkill(!showAddSkill)}><Plus className="h-3.5 w-3.5" />Add Skill</Button>
+            <h3 className="text-xl font-extrabold text-slate-800 dark:text-slate-100">Technical Expertise</h3>
+            <Button onClick={() => setShowAddSkill(!showAddSkill)} className="gap-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 border border-indigo-200 dark:border-indigo-500/30 font-bold shadow-sm">
+              <Plus className="h-4 w-4" strokeWidth={3} /> Add Skill
+            </Button>
           </div>
 
           {showAddSkill && (
-            <Card className="border-primary/30 animate-fade-in">
-              <CardContent className="pt-5 space-y-3">
-                <div className="grid sm:grid-cols-3 gap-3">
-                  <Input placeholder="Skill name" value={newSkill.name} onChange={e => setNewSkill({ ...newSkill, name: e.target.value })} />
-                  <select className="h-10 rounded-lg border border-input bg-background/50 px-3 text-sm"
-                    value={newSkill.category} onChange={e => setNewSkill({ ...newSkill, category: e.target.value as Skill['category'] })}>
-                    {SKILL_CATEGORIES.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
-                  </select>
-                  <div className="flex items-center gap-2">
-                    <input type="range" min={0} max={100} value={newSkill.proficiency} onChange={e => setNewSkill({ ...newSkill, proficiency: parseInt(e.target.value) })} className="flex-1" />
-                    <span className="text-xs w-8">{newSkill.proficiency}%</span>
+            <div className="glass-card p-6 border-indigo-200/50 dark:border-indigo-500/20 animate-fade-in">
+               <div className="grid sm:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Skill Name</Label>
+                    <Input placeholder="e.g. React, Python" value={newSkill.name} onChange={e => setNewSkill({ ...newSkill, name: e.target.value })} className="bg-white/50 dark:bg-white/5 border-slate-200 dark:border-white/10 rounded-xl font-bold" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Category</Label>
+                    <select className="w-full h-10 rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 px-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-400"
+                      value={newSkill.category} onChange={e => setNewSkill({ ...newSkill, category: e.target.value as Skill['category'] })}>
+                      {SKILL_CATEGORIES.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Proficiency ({newSkill.proficiency}%)</Label>
+                    <div className="flex items-center h-10">
+                      <input type="range" min={0} max={100} value={newSkill.proficiency} onChange={e => setNewSkill({ ...newSkill, proficiency: parseInt(e.target.value) })} className="w-full accent-indigo-500" />
+                    </div>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={handleAddSkill} disabled={saving}>{saving ? 'Saving…' : 'Add'}</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setShowAddSkill(false)}>Cancel</Button>
+                <div className="flex gap-3 mt-6 pt-6 border-t border-slate-200/60 dark:border-white/10">
+                  <Button onClick={handleAddSkill} disabled={saving} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 shadow-md">{saving ? 'Saving…' : 'Add Skill'}</Button>
+                  <Button variant="ghost" onClick={() => setShowAddSkill(false)} className="rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 font-bold text-slate-500">Cancel</Button>
                 </div>
-              </CardContent>
-            </Card>
+            </div>
           )}
 
           {skills.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground"><Code2 className="h-10 w-10 mx-auto mb-3 opacity-20" /><p className="text-sm">No skills yet. Add your first skill!</p></div>
-          ) : SKILL_CATEGORIES.filter(cat => groupedSkills[cat]?.length > 0).map(cat => (
-            <Card key={cat}>
-              <CardHeader className="pb-3"><CardTitle className="text-sm"><Badge className={cn('text-[10px]', CATEGORY_COLORS[cat])}>{CATEGORY_LABELS[cat]}</Badge></CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                {groupedSkills[cat].map(skill => (
-                  <div key={skill.id} className="flex items-center gap-3 group">
-                    <span className="text-sm w-28 shrink-0">{skill.name}</span>
-                    <div className="flex-1">
-                      <input type="range" min={0} max={100} value={skill.proficiency}
-                        onChange={e => handleUpdateSkillProficiency(skill, parseInt(e.target.value))}
-                        className="w-full accent-primary" />
-                    </div>
-                    <span className="text-xs font-mono text-muted-foreground w-8 text-right">{skill.proficiency}%</span>
-                    <Badge variant={skill.proficiency >= 70 ? 'success' : skill.proficiency >= 40 ? 'warning' : 'secondary'} className="text-[10px] shrink-0">
-                      {skill.proficiency >= 70 ? 'Strong' : skill.proficiency >= 40 ? 'Mid' : 'Learning'}
+             <div className="glass-card flex flex-col items-center justify-center py-16 border-dashed border-2">
+              <Code2 className="h-12 w-12 mb-4 opacity-20" />
+              <p className="text-[15px] font-bold text-slate-500">No skills added yet.</p>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 gap-6">
+              {SKILL_CATEGORIES.filter(cat => groupedSkills[cat]?.length > 0).map(cat => (
+                <div key={cat} className="glass-card p-6 flex flex-col">
+                  <div className="pb-4 border-b border-slate-200/60 dark:border-white/10 mb-4">
+                    <Badge className={cn('px-3 py-1 font-extrabold tracking-widest uppercase rounded-lg border', CATEGORY_COLORS[cat])}>
+                      {CATEGORY_LABELS[cat]}
                     </Badge>
-                    <button onClick={() => handleDeleteSkill(skill.id)} className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all shrink-0">
-                      <Trash2 className="h-3 w-3" />
-                    </button>
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-          ))}
+                  <div className="space-y-4 flex-1">
+                    {groupedSkills[cat].map(skill => (
+                      <div key={skill.id} className="group flex flex-col gap-2 p-3 rounded-xl hover:bg-white/40 dark:hover:bg-white/5 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-white/10">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[14px] font-bold text-slate-700 dark:text-slate-200">{skill.name}</span>
+                          <div className="flex items-center gap-3">
+                            <Badge className={cn('text-[10px] uppercase tracking-wider font-extrabold shadow-sm', skill.proficiency >= 80 ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : skill.proficiency >= 50 ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200')}>
+                              {skill.proficiency >= 80 ? 'Expert' : skill.proficiency >= 50 ? 'Intermediate' : 'Beginner'}
+                            </Badge>
+                            <button onClick={() => handleDeleteSkill(skill.id)} className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-500 transition-all shrink-0"><Trash2 className="h-3.5 w-3.5" /></button>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                           <input type="range" min={0} max={100} value={skill.proficiency}
+                            onChange={e => handleUpdateSkillProficiency(skill, parseInt(e.target.value))}
+                            className="w-full accent-indigo-400 opacity-60 group-hover:opacity-100 transition-opacity h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {/* PROJECTS */}
       {tab === 'projects' && (
-        <div className="space-y-4 animate-fade-in">
+        <div className="space-y-6 animate-fade-in no-print">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">{projects.length} projects</p>
-            <Button size="sm" variant="outline" className="gap-2" onClick={() => setShowAddProject(!showAddProject)}><Plus className="h-3.5 w-3.5" />Add Project</Button>
+            <h3 className="text-xl font-extrabold text-slate-800 dark:text-slate-100">Featured Projects</h3>
+            <Button onClick={() => setShowAddProject(!showAddProject)} className="gap-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 border border-indigo-200 dark:border-indigo-500/30 font-bold shadow-sm">
+              <Plus className="h-4 w-4" strokeWidth={3} /> Add Project
+            </Button>
           </div>
+
           {showAddProject && (
-            <Card className="border-primary/30 animate-fade-in">
-              <CardContent className="pt-5 space-y-3">
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <div className="space-y-1"><Label className="text-xs">Title *</Label><Input placeholder="Project name" value={newProject.title} onChange={e => setNewProject({ ...newProject, title: e.target.value })} /></div>
-                  <div className="space-y-1"><Label className="text-xs">Status</Label>
-                    <select className="w-full h-10 rounded-lg border border-input bg-background/50 px-3 text-sm"
-                      value={newProject.status} onChange={e => setNewProject({ ...newProject, status: e.target.value as Project['status'] })}>
-                      <option value="in_progress">In Progress</option><option value="completed">Completed</option><option value="planned">Planned</option>
-                    </select>
-                  </div>
-                  <div className="sm:col-span-2 space-y-1"><Label className="text-xs">Description</Label><Input placeholder="What does this project do?" value={newProject.description} onChange={e => setNewProject({ ...newProject, description: e.target.value })} /></div>
-                  <div className="space-y-1"><Label className="text-xs">Tech Stack (comma separated)</Label><Input placeholder="FastAPI, PostgreSQL, Redis" value={newProject.tech_stack} onChange={e => setNewProject({ ...newProject, tech_stack: e.target.value })} /></div>
-                  <div className="space-y-1"><Label className="text-xs">GitHub URL</Label><Input placeholder="github.com/user/repo" value={newProject.github_url} onChange={e => setNewProject({ ...newProject, github_url: e.target.value })} /></div>
-                  <div className="space-y-1"><Label className="text-xs">Live URL</Label><Input placeholder="yourproject.vercel.app" value={newProject.live_url} onChange={e => setNewProject({ ...newProject, live_url: e.target.value })} /></div>
+            <div className="glass-card p-6 border-indigo-200/50 dark:border-indigo-500/20 animate-fade-in">
+              <div className="grid sm:grid-cols-2 gap-6">
+                <div className="space-y-2"><Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Project Title</Label><Input placeholder="Awesome App" value={newProject.title} onChange={e => setNewProject({ ...newProject, title: e.target.value })} className="bg-white/50 dark:bg-white/5 border-slate-200 dark:border-white/10 rounded-xl font-bold" /></div>
+                <div className="space-y-2"><Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Status</Label>
+                  <select className="w-full h-10 rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 px-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-400"
+                    value={newProject.status} onChange={e => setNewProject({ ...newProject, status: e.target.value as Project['status'] })}>
+                    <option value="in_progress">In Progress</option><option value="completed">Completed</option><option value="planned">Planned</option>
+                  </select>
                 </div>
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={handleAddProject} disabled={saving}>{saving ? 'Saving…' : 'Add Project'}</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setShowAddProject(false)}>Cancel</Button>
-                </div>
-              </CardContent>
-            </Card>
+                <div className="sm:col-span-2 space-y-2"><Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Description</Label><Input placeholder="A brief summary of what you built..." value={newProject.description} onChange={e => setNewProject({ ...newProject, description: e.target.value })} className="bg-white/50 dark:bg-white/5 border-slate-200 dark:border-white/10 rounded-xl" /></div>
+                <div className="space-y-2"><Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Tech Stack (CSV)</Label><Input placeholder="React, Node.js, MongoDB" value={newProject.tech_stack} onChange={e => setNewProject({ ...newProject, tech_stack: e.target.value })} className="bg-white/50 dark:bg-white/5 border-slate-200 dark:border-white/10 rounded-xl" /></div>
+                <div className="space-y-2"><Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">GitHub URL</Label><Input placeholder="github.com/your/repo" value={newProject.github_url} onChange={e => setNewProject({ ...newProject, github_url: e.target.value })} className="bg-white/50 dark:bg-white/5 border-slate-200 dark:border-white/10 rounded-xl" /></div>
+                <div className="space-y-2"><Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Live URL</Label><Input placeholder="your-app.com" value={newProject.live_url} onChange={e => setNewProject({ ...newProject, live_url: e.target.value })} className="bg-white/50 dark:bg-white/5 border-slate-200 dark:border-white/10 rounded-xl" /></div>
+              </div>
+              <div className="flex gap-3 mt-6 pt-6 border-t border-slate-200/60 dark:border-white/10">
+                <Button onClick={handleAddProject} disabled={saving} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 shadow-md">{saving ? 'Saving…' : 'Save Project'}</Button>
+                <Button variant="ghost" onClick={() => setShowAddProject(false)} className="rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 font-bold text-slate-500">Cancel</Button>
+              </div>
+            </div>
           )}
+
           {projects.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground"><GitBranch className="h-10 w-10 mx-auto mb-3 opacity-20" /><p className="text-sm">No projects yet.</p></div>
-          ) : projects.map(project => (
-            <Card key={project.id} className="group">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold text-sm">{project.title}</h3>
-                      <Badge variant={project.status === 'completed' ? 'success' : project.status === 'in_progress' ? 'info' : 'secondary'} className="text-[10px]">
-                        {project.status === 'in_progress' ? 'In Progress' : project.status}
-                      </Badge>
+            <div className="glass-card flex flex-col items-center justify-center py-16 border-dashed border-2">
+              <GitBranch className="h-12 w-12 mb-4 opacity-20" />
+              <p className="text-[15px] font-bold text-slate-500">No projects added yet.</p>
+            </div>
+          ) : (
+            <div className="grid lg:grid-cols-2 gap-6">
+              {projects.map(project => (
+                <div key={project.id} className="glass-card group p-6 flex flex-col border border-slate-200/60 dark:border-white/10 hover:-translate-y-1 hover:shadow-lg transition-all duration-300">
+                  <div className="flex items-start justify-between gap-4 mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 text-indigo-500 shadow-sm shrink-0">
+                        <Code2 className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <h3 className="font-extrabold text-lg text-slate-800 dark:text-slate-100 tracking-tight">{project.title}</h3>
+                        <Badge className={cn('text-[9px] uppercase tracking-widest font-black mt-1 shadow-sm', project.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : project.status === 'in_progress' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600')}>
+                          {project.status.replace('_', ' ')}
+                        </Badge>
+                      </div>
                     </div>
-                    {project.description && <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{project.description}</p>}
-                    <div className="flex flex-wrap gap-1.5 mt-2">{project.tech_stack.map(t => <Badge key={t} variant="outline" className="text-[10px]">{t}</Badge>)}</div>
-                    <div className="flex gap-3 mt-2">
-                      {project.github_url && <a href={project.github_url.startsWith('http') ? project.github_url : `https://${project.github_url}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><Github className="h-3 w-3" />GitHub</a>}
-                      {project.live_url && <a href={project.live_url.startsWith('http') ? project.live_url : `https://${project.live_url}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ExternalLink className="h-3 w-3" />Live</a>}
-                    </div>
+                    <button onClick={() => handleDeleteProject(project.id)} className="opacity-0 group-hover:opacity-100 p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-500 transition-all shrink-0"><Trash2 className="h-4 w-4" /></button>
                   </div>
-                  <button onClick={() => handleDeleteProject(project.id)} className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all shrink-0"><Trash2 className="h-3.5 w-3.5" /></button>
+                  
+                  {project.description && <p className="text-[14px] text-slate-600 dark:text-slate-300 mb-4 flex-1">{project.description}</p>}
+                  
+                  <div className="flex flex-wrap gap-2 mb-6">
+                    {project.tech_stack.map(t => <Badge key={t} className="bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 border-none font-bold text-[11px] px-2.5 py-1">{t}</Badge>)}
+                  </div>
+                  
+                  <div className="flex gap-4 pt-4 border-t border-slate-100 dark:border-white/10 mt-auto">
+                    {project.github_url && <a href={project.github_url.startsWith('http') ? project.github_url : `https://${project.github_url}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"><Github className="h-4 w-4" /> View Source</a>}
+                    {project.live_url && <a href={project.live_url.startsWith('http') ? project.live_url : `https://${project.live_url}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"><ExternalLink className="h-4 w-4" /> Live Demo</a>}
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {/* CERTIFICATIONS */}
       {tab === 'certifications' && (
-        <div className="space-y-4 animate-fade-in">
+        <div className="space-y-6 animate-fade-in no-print">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">{certs.length} certificates</p>
-            <Button size="sm" variant="outline" className="gap-2" onClick={() => setShowAddCert(!showAddCert)}><Plus className="h-3.5 w-3.5" />Add Certificate</Button>
+            <h3 className="text-xl font-extrabold text-slate-800 dark:text-slate-100">Certifications</h3>
+            <Button onClick={() => setShowAddCert(!showAddCert)} className="gap-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 border border-indigo-200 dark:border-indigo-500/30 font-bold shadow-sm">
+              <Plus className="h-4 w-4" strokeWidth={3} /> Add Certificate
+            </Button>
           </div>
+
           {showAddCert && (
-            <Card className="border-primary/30 animate-fade-in">
-              <CardContent className="pt-5 space-y-3">
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <div className="space-y-1"><Label className="text-xs">Certificate Name *</Label><Input placeholder="e.g. NPTEL: Machine Learning" value={newCert.name} onChange={e => setNewCert({ ...newCert, name: e.target.value })} /></div>
-                  <div className="space-y-1"><Label className="text-xs">Issuer *</Label><Input placeholder="e.g. IIT Kharagpur (NPTEL)" value={newCert.issuer} onChange={e => setNewCert({ ...newCert, issuer: e.target.value })} /></div>
-                  <div className="space-y-1"><Label className="text-xs">Issue Date</Label><Input type="date" value={newCert.issue_date} onChange={e => setNewCert({ ...newCert, issue_date: e.target.value })} /></div>
-                  <div className="space-y-1"><Label className="text-xs">Credential ID</Label><Input placeholder="NPTEL24CS123" value={newCert.credential_id} onChange={e => setNewCert({ ...newCert, credential_id: e.target.value })} /></div>
-                  <div className="sm:col-span-2 space-y-1"><Label className="text-xs">Verify URL</Label><Input placeholder="nptel.ac.in/verify/..." value={newCert.cert_url} onChange={e => setNewCert({ ...newCert, cert_url: e.target.value })} /></div>
-                </div>
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={handleAddCert} disabled={saving}>{saving ? 'Saving…' : 'Add Certificate'}</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setShowAddCert(false)}>Cancel</Button>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="glass-card p-6 border-indigo-200/50 dark:border-indigo-500/20 animate-fade-in">
+              <div className="grid sm:grid-cols-2 gap-6">
+                <div className="space-y-2"><Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Certificate Name</Label><Input placeholder="e.g. NPTEL: Machine Learning" value={newCert.name} onChange={e => setNewCert({ ...newCert, name: e.target.value })} className="bg-white/50 dark:bg-white/5 border-slate-200 dark:border-white/10 rounded-xl font-bold" /></div>
+                <div className="space-y-2"><Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Issuer</Label><Input placeholder="e.g. IIT Kharagpur (NPTEL)" value={newCert.issuer} onChange={e => setNewCert({ ...newCert, issuer: e.target.value })} className="bg-white/50 dark:bg-white/5 border-slate-200 dark:border-white/10 rounded-xl" /></div>
+                <div className="space-y-2"><Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Issue Date</Label><Input type="date" value={newCert.issue_date} onChange={e => setNewCert({ ...newCert, issue_date: e.target.value })} className="bg-white/50 dark:bg-white/5 border-slate-200 dark:border-white/10 rounded-xl" /></div>
+                <div className="space-y-2"><Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Credential ID</Label><Input placeholder="NPTEL24CS123" value={newCert.credential_id} onChange={e => setNewCert({ ...newCert, credential_id: e.target.value })} className="bg-white/50 dark:bg-white/5 border-slate-200 dark:border-white/10 rounded-xl" /></div>
+                <div className="sm:col-span-2 space-y-2"><Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Verify URL</Label><Input placeholder="nptel.ac.in/verify/..." value={newCert.cert_url} onChange={e => setNewCert({ ...newCert, cert_url: e.target.value })} className="bg-white/50 dark:bg-white/5 border-slate-200 dark:border-white/10 rounded-xl" /></div>
+              </div>
+              <div className="flex gap-3 mt-6 pt-6 border-t border-slate-200/60 dark:border-white/10">
+                <Button onClick={handleAddCert} disabled={saving} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 shadow-md">{saving ? 'Saving…' : 'Add Certificate'}</Button>
+                <Button variant="ghost" onClick={() => setShowAddCert(false)} className="rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 font-bold text-slate-500">Cancel</Button>
+              </div>
+            </div>
           )}
+
           {certs.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground"><Award className="h-10 w-10 mx-auto mb-3 opacity-20" /><p className="text-sm">No certificates yet.</p></div>
-          ) : certs.map(cert => (
-            <Card key={cert.id} className="group">
-              <CardContent className="p-5">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-400/10 border border-amber-400/20"><Award className="h-5 w-5 text-amber-400" /></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold">{cert.name}</p>
-                    <p className="text-xs text-muted-foreground">{cert.issuer}</p>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                      {cert.issue_date && <span>{cert.issue_date}</span>}
-                      {cert.credential_id && <span>ID: {cert.credential_id}</span>}
+            <div className="glass-card flex flex-col items-center justify-center py-16 border-dashed border-2">
+              <Award className="h-12 w-12 mb-4 opacity-20" />
+              <p className="text-[15px] font-bold text-slate-500">No certificates added yet.</p>
+            </div>
+          ) : (
+            <div className="grid lg:grid-cols-2 gap-6">
+              {certs.map(cert => (
+                <div key={cert.id} className="glass-card group p-6 flex flex-col border border-slate-200/60 dark:border-white/10 hover:-translate-y-1 hover:shadow-lg transition-all duration-300">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20 text-amber-500 shadow-sm shrink-0">
+                        <Award className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <h3 className="font-extrabold text-[15px] text-slate-800 dark:text-slate-100 tracking-tight">{cert.name}</h3>
+                        <p className="text-[13px] font-bold text-slate-500 dark:text-slate-400 mt-0.5">{cert.issuer}</p>
+                      </div>
                     </div>
-                    {cert.cert_url && <a href={cert.cert_url.startsWith('http') ? cert.cert_url : `https://${cert.cert_url}`} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-1 text-xs text-primary hover:underline"><ExternalLink className="h-3 w-3" />Verify</a>}
+                    <button onClick={() => handleDeleteCert(cert.id)} className="opacity-0 group-hover:opacity-100 p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-500 transition-all shrink-0"><Trash2 className="h-4 w-4" /></button>
                   </div>
-                  <button onClick={() => handleDeleteCert(cert.id)} className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all shrink-0"><Trash2 className="h-3.5 w-3.5" /></button>
+                  
+                  <div className="flex items-center gap-4 mt-6 pt-4 border-t border-slate-100 dark:border-white/10">
+                    {cert.issue_date && <span className="text-xs font-bold text-slate-400">Issued: {cert.issue_date}</span>}
+                    {cert.credential_id && <span className="text-xs font-bold text-slate-400 border-l border-slate-200 dark:border-white/10 pl-4">ID: {cert.credential_id}</span>}
+                    {cert.cert_url && (
+                      <a href={cert.cert_url.startsWith('http') ? cert.cert_url : `https://${cert.cert_url}`} target="_blank" rel="noreferrer" className="ml-auto flex items-center gap-1.5 text-xs font-bold text-indigo-500 hover:text-indigo-600 transition-colors">
+                        <ExternalLink className="h-4 w-4" /> Verify
+                      </a>
+                    )}
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {/* EXPERIENCE */}
       {tab === 'experience' && (
-        <div className="space-y-4 animate-fade-in">
+        <div className="space-y-6 animate-fade-in no-print">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">{experience.length} entries</p>
-            <Button size="sm" variant="outline" className="gap-2" onClick={() => setShowAddExp(!showAddExp)}><Plus className="h-3.5 w-3.5" />Add Experience</Button>
+            <h3 className="text-xl font-extrabold text-slate-800 dark:text-slate-100">Work & Experience</h3>
+            <Button onClick={() => setShowAddExp(!showAddExp)} className="gap-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 border border-indigo-200 dark:border-indigo-500/30 font-bold shadow-sm">
+              <Plus className="h-4 w-4" strokeWidth={3} /> Add Experience
+            </Button>
           </div>
+
           {showAddExp && (
-            <Card className="border-primary/30 animate-fade-in">
-              <CardContent className="pt-5 space-y-3">
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <div className="space-y-1"><Label className="text-xs">Company *</Label><Input placeholder="Company name" value={newExp.company} onChange={e => setNewExp({ ...newExp, company: e.target.value })} /></div>
-                  <div className="space-y-1"><Label className="text-xs">Role *</Label><Input placeholder="e.g. Backend Intern" value={newExp.role} onChange={e => setNewExp({ ...newExp, role: e.target.value })} /></div>
-                  <div className="space-y-1"><Label className="text-xs">Start Date</Label><Input type="date" value={newExp.start_date} onChange={e => setNewExp({ ...newExp, start_date: e.target.value })} /></div>
-                  <div className="space-y-1"><Label className="text-xs">End Date</Label><Input type="date" value={newExp.end_date} disabled={newExp.is_current} onChange={e => setNewExp({ ...newExp, end_date: e.target.value })} /></div>
-                  <div className="flex items-center gap-2 col-span-2">
-                    <input type="checkbox" id="current" checked={newExp.is_current} onChange={e => setNewExp({ ...newExp, is_current: e.target.checked, end_date: '' })} />
-                    <label htmlFor="current" className="text-xs">Currently working here</label>
-                  </div>
-                  <div className="sm:col-span-2 space-y-1"><Label className="text-xs">Description</Label><Input placeholder="What did you do?" value={newExp.description} onChange={e => setNewExp({ ...newExp, description: e.target.value })} /></div>
+            <div className="glass-card p-6 border-indigo-200/50 dark:border-indigo-500/20 animate-fade-in">
+              <div className="grid sm:grid-cols-2 gap-6">
+                <div className="space-y-2"><Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Company Name</Label><Input placeholder="e.g. Google, Startup Inc." value={newExp.company} onChange={e => setNewExp({ ...newExp, company: e.target.value })} className="bg-white/50 dark:bg-white/5 border-slate-200 dark:border-white/10 rounded-xl font-bold" /></div>
+                <div className="space-y-2"><Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Role</Label><Input placeholder="e.g. Backend Engineering Intern" value={newExp.role} onChange={e => setNewExp({ ...newExp, role: e.target.value })} className="bg-white/50 dark:bg-white/5 border-slate-200 dark:border-white/10 rounded-xl font-bold" /></div>
+                <div className="space-y-2"><Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Start Date</Label><Input type="date" value={newExp.start_date} onChange={e => setNewExp({ ...newExp, start_date: e.target.value })} className="bg-white/50 dark:bg-white/5 border-slate-200 dark:border-white/10 rounded-xl" /></div>
+                <div className="space-y-2"><Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">End Date</Label><Input type="date" value={newExp.end_date} disabled={newExp.is_current} onChange={e => setNewExp({ ...newExp, end_date: e.target.value })} className="bg-white/50 dark:bg-white/5 border-slate-200 dark:border-white/10 rounded-xl" /></div>
+                <div className="flex items-center gap-3 col-span-2">
+                  <input type="checkbox" id="current" checked={newExp.is_current} onChange={e => setNewExp({ ...newExp, is_current: e.target.checked, end_date: '' })} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
+                  <label htmlFor="current" className="text-sm font-bold text-slate-700 dark:text-slate-200">I am currently working here</label>
                 </div>
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={handleAddExp} disabled={saving}>{saving ? 'Saving…' : 'Add Experience'}</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setShowAddExp(false)}>Cancel</Button>
-                </div>
-              </CardContent>
-            </Card>
+                <div className="sm:col-span-2 space-y-2"><Label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Description</Label><Input placeholder="Summarize your responsibilities and achievements..." value={newExp.description} onChange={e => setNewExp({ ...newExp, description: e.target.value })} className="bg-white/50 dark:bg-white/5 border-slate-200 dark:border-white/10 rounded-xl" /></div>
+              </div>
+              <div className="flex gap-3 mt-6 pt-6 border-t border-slate-200/60 dark:border-white/10">
+                <Button onClick={handleAddExp} disabled={saving} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 shadow-md">{saving ? 'Saving…' : 'Add Experience'}</Button>
+                <Button variant="ghost" onClick={() => setShowAddExp(false)} className="rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 font-bold text-slate-500">Cancel</Button>
+              </div>
+            </div>
           )}
+
           {experience.length === 0 ? (
-            <div className="text-center py-16 text-muted-foreground"><Briefcase className="h-12 w-12 mx-auto mb-4 opacity-20" /><p className="text-sm">No experience yet. Add internships or jobs.</p></div>
-          ) : experience.map(exp => (
-            <Card key={exp.id} className="group">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold">{exp.role}</p>
-                    <p className="text-xs text-muted-foreground">{exp.company}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{exp.start_date} – {exp.is_current ? 'Present' : exp.end_date}</p>
-                    {exp.description && <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{exp.description}</p>}
+            <div className="glass-card flex flex-col items-center justify-center py-16 border-dashed border-2">
+              <Briefcase className="h-12 w-12 mb-4 opacity-20" />
+              <p className="text-[15px] font-bold text-slate-500">No experience added yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {experience.map(exp => (
+                <div key={exp.id} className="glass-card group p-6 flex flex-col sm:flex-row gap-6 border border-slate-200/60 dark:border-white/10 hover:-translate-y-1 hover:shadow-lg transition-all duration-300">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-400 shrink-0 shadow-sm">
+                    <Briefcase className="h-6 w-6" />
                   </div>
-                  <button onClick={() => handleDeleteExp(exp.id)} className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all shrink-0"><Trash2 className="h-3.5 w-3.5" /></button>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                      <h3 className="font-extrabold text-lg text-slate-800 dark:text-slate-100 tracking-tight">{exp.role}</h3>
+                      <button onClick={() => handleDeleteExp(exp.id)} className="opacity-0 group-hover:opacity-100 p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-500 transition-all shrink-0 absolute top-4 right-4 sm:relative sm:top-0 sm:right-0"><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                    <p className="text-[14px] font-bold text-indigo-600 dark:text-indigo-400 mb-1">{exp.company}</p>
+                    <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mb-4 uppercase tracking-widest">{exp.start_date} – {exp.is_current ? 'Present' : exp.end_date}</p>
+                    {exp.description && <p className="text-[14px] text-slate-600 dark:text-slate-300 leading-relaxed border-t border-slate-100 dark:border-white/10 pt-4 mt-2">{exp.description}</p>}
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* ATS PREVIEW */}
+      {/* ATS PREVIEW (Printable Area) */}
       {tab === 'preview' && (
-        <Card className="animate-fade-in">
-          <CardContent className="p-8 font-sans max-w-3xl mx-auto">
-            <div className="text-center border-b border-border pb-4 mb-4">
-              <h1 className="text-2xl font-bold">{profile.full_name || 'Your Name'}</h1>
-              <p className="text-sm text-primary font-medium mt-0.5">{profile.career_goal || 'Career Goal'}</p>
-              <div className="flex justify-center flex-wrap gap-4 mt-2 text-xs text-muted-foreground">
+        <div id="resume-preview" className="glass-card animate-fade-in overflow-hidden border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 shadow-2xl">
+          <div className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-white/10 p-3 flex justify-center text-xs font-bold text-slate-500 uppercase tracking-widest no-print">
+            Print / PDF Preview Mode (A4 Optimized)
+          </div>
+          <div className="p-8 sm:p-12 font-sans max-w-[800px] mx-auto bg-white dark:bg-white text-black min-h-[1056px] shadow-inner print:p-0 print:shadow-none print:m-0">
+            <div className="text-center border-b-2 border-slate-800 pb-6 mb-6">
+              <h1 className="text-4xl font-black tracking-tight text-slate-900">{profile.full_name || 'Your Name'}</h1>
+              <p className="text-lg font-bold text-indigo-600 mt-1 uppercase tracking-widest">{profile.career_goal || 'Professional Title'}</p>
+              <div className="flex justify-center flex-wrap gap-4 mt-3 text-sm font-medium text-slate-600">
                 {profile.email && <span>{profile.email}</span>}
                 {profile.github_url && <span>{profile.github_url}</span>}
                 {profile.linkedin_url && <span>{profile.linkedin_url}</span>}
               </div>
             </div>
-            {bio && <div className="mb-4"><h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-1 mb-2">Summary</h2><p className="text-sm leading-relaxed">{bio}</p></div>}
-            {profile.university && <div className="mb-4"><h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-1 mb-2">Education</h2>
-              <div className="flex justify-between"><div><p className="text-sm font-semibold">{profile.degree}</p><p className="text-xs text-muted-foreground">{profile.university}</p></div><div className="text-right text-xs text-muted-foreground"><p>2023 – 2027</p>{profile.cgpa && <p className="font-semibold text-foreground">CGPA: {profile.cgpa}</p>}</div></div></div>}
-            {skills.length > 0 && <div className="mb-4"><h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-1 mb-2">Technical Skills</h2>
-              <div className="grid grid-cols-2 gap-1 text-xs">
-                {SKILL_CATEGORIES.filter(c => groupedSkills[c]?.length).map(c => <p key={c}><strong>{CATEGORY_LABELS[c]}:</strong> {groupedSkills[c].map(s => s.name).join(', ')}</p>)}
-              </div></div>}
-            {projects.length > 0 && <div className="mb-4"><h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-1 mb-2">Projects</h2>
-              {projects.map(p => <div key={p.id} className="mb-2"><div className="flex justify-between"><p className="text-sm font-semibold">{p.title}</p><p className="text-xs text-muted-foreground">{p.tech_stack.join(', ')}</p></div>{p.description && <p className="text-xs text-muted-foreground mt-0.5">• {p.description}</p>}</div>)}</div>}
-            {certs.length > 0 && <div><h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-1 mb-2">Certifications</h2>
-              {certs.map(c => <div key={c.id} className="flex justify-between text-xs mb-1"><span className="font-medium">{c.name}</span><span className="text-muted-foreground">{c.issuer} · {c.issue_date}</span></div>)}</div>}
-          </CardContent>
-        </Card>
+            
+            {bio && (
+              <div className="mb-6">
+                <h2 className="text-sm font-black uppercase tracking-widest border-b border-slate-300 pb-1 mb-3 text-slate-800">Summary</h2>
+                <p className="text-[15px] leading-relaxed text-slate-700">{bio}</p>
+              </div>
+            )}
+            
+            {profile.university && (
+              <div className="mb-6">
+                <h2 className="text-sm font-black uppercase tracking-widest border-b border-slate-300 pb-1 mb-3 text-slate-800">Education</h2>
+                <div className="flex justify-between items-baseline text-slate-800">
+                  <div>
+                    <p className="text-lg font-bold">{profile.degree}</p>
+                    <p className="text-[15px] text-slate-600 font-medium">{profile.university}</p>
+                  </div>
+                  <div className="text-right text-[15px] font-medium text-slate-600">
+                    <p>2023 – 2027</p>
+                    {profile.cgpa && <p className="font-bold text-slate-800">CGPA: {profile.cgpa}</p>}
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {skills.length > 0 && (
+              <div className="mb-6">
+                <h2 className="text-sm font-black uppercase tracking-widest border-b border-slate-300 pb-1 mb-3 text-slate-800">Technical Skills</h2>
+                <div className="grid grid-cols-1 gap-2 text-[15px] text-slate-800">
+                  {SKILL_CATEGORIES.filter(c => groupedSkills[c]?.length).map(c => (
+                    <p key={c}><span className="font-bold min-w-[120px] inline-block">{CATEGORY_LABELS[c]}:</span> {groupedSkills[c].map(s => s.name).join(', ')}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {projects.length > 0 && (
+              <div className="mb-6">
+                <h2 className="text-sm font-black uppercase tracking-widest border-b border-slate-300 pb-1 mb-3 text-slate-800">Projects</h2>
+                {projects.map(p => (
+                  <div key={p.id} className="mb-4 text-slate-800">
+                    <div className="flex justify-between items-baseline">
+                      <p className="text-[16px] font-bold">{p.title}</p>
+                      <p className="text-[13px] font-bold text-slate-500">{p.tech_stack.join(' | ')}</p>
+                    </div>
+                    {p.description && <p className="text-[15px] mt-1 text-slate-700">{p.description}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {experience.length > 0 && (
+              <div className="mb-6">
+                <h2 className="text-sm font-black uppercase tracking-widest border-b border-slate-300 pb-1 mb-3 text-slate-800">Experience</h2>
+                {experience.map(e => (
+                  <div key={e.id} className="mb-4 text-slate-800">
+                    <div className="flex justify-between items-baseline">
+                      <p className="text-[16px] font-bold">{e.role} <span className="font-medium text-slate-600">at {e.company}</span></p>
+                      <p className="text-[13px] font-bold text-slate-500">{e.start_date} – {e.is_current ? 'Present' : e.end_date}</p>
+                    </div>
+                    {e.description && <p className="text-[15px] mt-1 text-slate-700">{e.description}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   )
