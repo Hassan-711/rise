@@ -17,23 +17,22 @@ const CATEGORY_COLORS: Record<string, string> = { language: 'text-blue-600 dark:
 
 type Tab = 'overview' | 'skills' | 'projects' | 'certifications' | 'experience' | 'preview'
 
-// Empty profile with all fields typed
-const EMPTY_PROFILE: Profile = {
+// Profile interface with role injected safely
+const EMPTY_PROFILE: Profile & { role?: string | null } = {
   id: '', full_name: null, email: null, bio: null, avatar_url: null,
   university: null, degree: null, enrollment_no: null, current_semester: null,
-  cgpa: null, career_goal: null, linkedin_url: null, github_url: null,
+  cgpa: null, career_goal: null, role: null, linkedin_url: null, github_url: null,
   portfolio_url: null, created_at: '', updated_at: '',
 }
 
 export default function ResumePage() {
   const [tab, setTab] = useState<Tab>('overview')
   const [loading, setLoading] = useState(true)
-  const [profile, setProfile] = useState<Profile>(EMPTY_PROFILE)
+  const [profile, setProfile] = useState<Profile & { role?: string | null }>(EMPTY_PROFILE)
   const [bio, setBio] = useState('')
   const [editBio, setEditBio] = useState(false)
   const [savingBio, setSavingBio] = useState(false)
   
-  // States for Editable Title (Career Goal)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [tempTitle, setTempTitle] = useState('')
 
@@ -42,7 +41,6 @@ export default function ResumePage() {
   const [certs, setCerts] = useState<Certification[]>([])
   const [experience, setExperience] = useState<WorkExperience[]>([])
 
-  // Add forms
   const [showAddSkill, setShowAddSkill] = useState(false)
   const [newSkill, setNewSkill] = useState({ name: '', category: 'language' as Skill['category'], proficiency: 50 })
   const [showAddProject, setShowAddProject] = useState(false)
@@ -56,10 +54,11 @@ export default function ResumePage() {
   useEffect(() => {
     Promise.all([getProfile(), getSkills(), getProjects(), getCertifications(), getWorkExperience()]).then(([p, s, pr, c, e]) => {
       if (p) {
-        const typedProfile = p as Profile
+        const typedProfile = p as Profile & { role?: string | null }
         setProfile(typedProfile)
         setBio(typedProfile.bio ?? '')
-        setTempTitle(typedProfile.career_goal ?? '')
+        // 🔥 Fetches the role perfectly whether it's saved as role or career_goal
+        setTempTitle(typedProfile.role ?? typedProfile.career_goal ?? '')
       }
       setSkills(s as Skill[])
       setProjects(pr as Project[])
@@ -69,32 +68,29 @@ export default function ResumePage() {
     })
   }, [])
 
-  // ── SAVE TITLE (Career Goal) ──
+  // Derived Title to fix the Ghost Data
+  const currentTitle = profile.role || profile.career_goal
+
   async function saveTitle() {
     setIsEditingTitle(false)
-    if (tempTitle.trim() === profile.career_goal) return
+    if (tempTitle.trim() === currentTitle) return
     
-    // Update local state immediately
-    setProfile(p => ({ ...p, career_goal: tempTitle.trim() }))
+    setProfile(p => ({ ...p, role: tempTitle.trim(), career_goal: tempTitle.trim() }))
     
-    // Update DB
+    // 🔥 FIX: Removed 'role' from here to prevent Supabase column error. Now only saves to 'career_goal'
     const { error } = await updateProfile({ career_goal: tempTitle.trim(), updated_at: new Date().toISOString() })
     if (error) {
       toast({ title: 'Failed to update title', variant: 'destructive' })
-      // Revert if error
-      setTempTitle(profile.career_goal ?? '')
-      setProfile(p => ({ ...p, career_goal: profile.career_goal }))
+      setTempTitle(currentTitle ?? '')
+      setProfile(p => ({ ...p, role: p.role, career_goal: p.career_goal }))
     } else {
       toast({ title: 'Title updated ✅' })
     }
   }
 
-  // ── EXPORT PDF LOGIC ──
   function handleExportPDF() {
-    // We switch to preview tab to ensure content is rendered before printing
     if (tab !== 'preview') {
       setTab('preview')
-      // Small timeout to allow DOM to render the preview tab before calling print
       setTimeout(() => {
         window.print()
       }, 300)
@@ -223,7 +219,6 @@ export default function ResumePage() {
             <div>
               <h2 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">{profile.full_name || 'Your Name'}</h2>
               
-              {/* ── Editable Title Logic ── */}
               <div className="mt-1">
                 {isEditingTitle ? (
                   <Input 
@@ -239,7 +234,7 @@ export default function ResumePage() {
                     onClick={() => setIsEditingTitle(true)}
                     className="text-sm font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-2 group"
                   >
-                    {profile.career_goal ? profile.career_goal : <span className="opacity-50 border-b border-dashed border-indigo-400/50">Add Professional Title (e.g. Software Engineer)...</span>}
+                    {currentTitle ? currentTitle : <span className="opacity-50 border-b border-dashed border-indigo-400/50">Add Professional Title (e.g. Software Engineer)...</span>}
                     <Edit3 className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </p>
                 )}
