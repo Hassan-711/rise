@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import {
   Map, ChevronDown, ChevronUp, Plus, Target, Trophy,
   Trash2, Calendar, Edit3, Check, X, Loader2, RefreshCw,
-  CheckCircle2, Circle, AlertTriangle, Zap, Goal, Flag
+  CheckCircle2, Circle, AlertTriangle, Zap, Goal, Flag, Sparkles
 } from 'lucide-react'
 import { cn, formatDate, getCategoryColor } from '@/lib/utils'
 import { toast } from '@/components/ui/toaster'
@@ -24,6 +24,9 @@ import { StatCard } from '@/components/dashboard/StatCard'
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
+// The proxy path we set in next.config.mjs
+const API_URL = '/api' 
+
 const CATEGORY_LABELS: Record<string, string> = {
   dsa: 'DSA', backend: 'Backend', ai_ml: 'AI/ML',
   project: 'Projects', internship: 'Internship',
@@ -100,6 +103,12 @@ export default function RoadmapPage() {
   const [deleteMilestoneId, setDeleteMilestoneId] = useState<string | null>(null)
   const [deletingMilestone, setDeletingMilestone] = useState(false)
 
+  // AI Generator State
+  const [showAIForm, setShowAIForm] = useState(false)
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiDays, setAiDays] = useState(30)
+  const [generatingAI, setGeneratingAI] = useState(false)
+
   // ── Data loading ─────────────────────────────────────────────────────────────
   const loadGoals = useCallback(() => {
     setLoading(true)
@@ -115,6 +124,71 @@ export default function RoadmapPage() {
   const totalMilestones = allMilestones.length
   const doneMilestones  = allMilestones.filter(m => m.status === 'completed').length
   const overallProgress = totalMilestones ? Math.round((doneMilestones / totalMilestones) * 100) : 0
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // AI HANDLER
+  // ─────────────────────────────────────────────────────────────────────────────
+  async function handleGenerateAI() {
+    if (!aiPrompt.trim() || generatingAI) return
+    setGeneratingAI(true)
+    
+    try {
+      // 1. Call AI Backend
+      const res = await fetch(`${API_URL}/generate-roadmap`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: aiPrompt.trim(), days: aiDays })
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || 'Failed to generate roadmap from AI')
+
+      const aiTasks = data.tasks
+      const today = new Date()
+
+      // 2. Create the Main Goal in DB
+      const targetDateISO = new Date(today.getTime() + (aiDays * 24 * 60 * 60 * 1000)).toISOString().split('T')[0]
+      const goalRes = await addCareerGoal({
+        title: aiPrompt.trim(),
+        description: `AI Generated Roadmap for ${aiDays} days`,
+        category: 'backend', // Defaulting to backend, user can edit
+        target_date: targetDateISO,
+        priority: 10,
+        status: 'active',
+      })
+
+      if (goalRes.error) throw new Error(goalRes.error)
+      const newGoalId = (goalRes.data as CareerGoal).id
+
+      // 3. Add all AI tasks as Milestones under this Goal
+      let addedMilestones = 0
+      for (let i = 0; i < aiTasks.length; i++) {
+        const aiTask = aiTasks[i]
+        const msDate = new Date(today)
+        msDate.setDate(msDate.getDate() + i)
+        
+        await addMilestone({
+          goal_id: newGoalId,
+          title: aiTask.title,
+          target_date: msDate.toISOString().split('T')[0],
+          status: 'pending',
+          resources: []
+        })
+        addedMilestones++
+      }
+
+      toast({ title: 'AI Magic Complete! ✨', description: `Added Goal and ${addedMilestones} milestones.` })
+      setAiPrompt('')
+      setShowAIForm(false)
+      loadGoals() // Refresh the UI with new data
+
+    } catch (error: any) {
+      toast({ title: 'AI Generation Failed 🚨', description: error.message, variant: 'destructive' })
+    } finally {
+      setGeneratingAI(false)
+    }
+  }
+
 
   // ─────────────────────────────────────────────────────────────────────────────
   // GOAL HANDLERS
@@ -310,11 +384,14 @@ export default function RoadmapPage() {
             {goals.length} total goals
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="ghost" className="rounded-xl border border-slate-200 dark:border-white/10 hover:bg-white dark:hover:bg-white/5" onClick={loadGoals} title="Refresh">
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button onClick={() => { setShowAddGoal(s => !s); setEditGoalId(null) }} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 shadow-md gap-2">
+          <Button onClick={() => { setShowAIForm(s => !s); setShowAddGoal(false); setEditGoalId(null) }} className="rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-bold px-6 shadow-md gap-2">
+            <Sparkles className="h-4 w-4" /> Auto-Generate (AI)
+          </Button>
+          <Button onClick={() => { setShowAddGoal(s => !s); setShowAIForm(false); setEditGoalId(null) }} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 shadow-md gap-2">
             <Plus className="h-4 w-4" /> Add Goal
           </Button>
         </div>
@@ -346,6 +423,35 @@ export default function RoadmapPage() {
           </div>
           <div className="relative z-10 h-3 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden border border-slate-200/50 dark:border-white/5">
              <div className="h-full transition-all duration-1000 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500" style={{ width: `${overallProgress}%` }} />
+          </div>
+        </div>
+      )}
+
+      {/* ── AI Auto-Generate Form ── */}
+      {showAIForm && (
+        <div className="glass-card p-6 border-purple-200/50 dark:border-purple-500/20 bg-purple-50/30 dark:bg-purple-900/10 animate-fade-in space-y-6">
+          <p className="text-lg font-black tracking-tight text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-purple-500" /> AI Roadmap Generator
+          </p>
+          <div className="grid sm:grid-cols-3 gap-6">
+            <div className="sm:col-span-2 space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">What do you want to learn? *</Label>
+              <Input placeholder="e.g. Master Next.js Backend" className="rounded-xl font-bold h-11"
+                value={aiPrompt} onChange={e => setAiPrompt(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleGenerateAI()} />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Timeline (Days)</Label>
+              <Input type="number" min={1} max={100} className="rounded-xl font-bold h-11"
+                value={aiDays} onChange={e => setAiDays(parseInt(e.target.value) || 30)} />
+            </div>
+          </div>
+          <div className="flex gap-3 pt-4 border-t border-purple-100 dark:border-purple-500/10">
+            <Button onClick={handleGenerateAI} disabled={generatingAI} className="rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold h-10 px-8 shadow-md">
+              {generatingAI ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
+              {generatingAI ? 'Cooking Magic…' : 'Generate Tasks'}
+            </Button>
+            <Button variant="ghost" onClick={() => setShowAIForm(false)} className="rounded-xl font-bold h-10 text-slate-500">Cancel</Button>
           </div>
         </div>
       )}
@@ -630,4 +736,4 @@ export default function RoadmapPage() {
       )}
     </div>
   )
-}   
+}
