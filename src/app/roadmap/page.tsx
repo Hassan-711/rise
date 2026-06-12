@@ -109,6 +109,9 @@ export default function RoadmapPage() {
   const [aiDays, setAiDays] = useState(30)
   const [generatingAI, setGeneratingAI] = useState(false)
 
+  // Export State
+  const [exporting, setExporting] = useState(false)
+
   // ── Data loading ─────────────────────────────────────────────────────────────
   const loadGoals = useCallback(() => {
     setLoading(true)
@@ -189,6 +192,55 @@ export default function RoadmapPage() {
     }
   }
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // EXPORT HANDLER (UPDATED & CLEANED)
+  // ─────────────────────────────────────────────────────────────────────────────
+  async function handleExportRoadmap() {
+    if (goals.length === 0 || exporting) {
+      toast({ title: 'No goals to export!' })
+      return;
+    }
+    setExporting(true);
+    try {
+      // 1. Sirf wahi data bhejenge jo Python ko chahiye (No extra Supabase fields)
+      const cleanGoals = goals.map(g => ({
+        title: g.title,
+        status: g.status,
+        description: g.description || null,
+        milestones: (g.milestones || []).map(m => ({
+          title: m.title,
+          status: m.status
+        }))
+      }));
+
+      // 2. Clean data ko API mein bhejna
+      const response = await fetch(`${API_URL}/export-roadmap`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goals: cleanGoals }), 
+      });
+
+      if (!response.ok) throw new Error("Export route not found or server error");
+
+      // 3. File Download Magic
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `My_RiseOS_Roadmap.md`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast({ title: 'Roadmap Exported! 📄' });
+    } catch (error) {
+      console.error("Export error:", error);
+      toast({ title: 'Export failed 🚨', description: "Check if backend has the new route.", variant: 'destructive' });
+    } finally {
+      setExporting(false);
+    }
+  }
 
   // ─────────────────────────────────────────────────────────────────────────────
   // GOAL HANDLERS
@@ -388,6 +440,12 @@ export default function RoadmapPage() {
           <Button variant="ghost" className="rounded-xl border border-slate-200 dark:border-white/10 hover:bg-white dark:hover:bg-white/5" onClick={loadGoals} title="Refresh">
             <RefreshCw className="h-4 w-4" />
           </Button>
+          
+          <Button onClick={handleExportRoadmap} disabled={exporting} className="rounded-xl bg-slate-800 hover:bg-slate-900 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-slate-900 font-bold px-6 shadow-md gap-2">
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Map className="h-4 w-4" />}
+            {exporting ? 'Exporting...' : 'Export .MD'}
+          </Button>
+
           <Button onClick={() => { setShowAIForm(s => !s); setShowAddGoal(false); setEditGoalId(null) }} className="rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-bold px-6 shadow-md gap-2">
             <Sparkles className="h-4 w-4" /> Auto-Generate (AI)
           </Button>
