@@ -400,7 +400,7 @@ export default function AIPredictorPage() {
               {warnBacklogs && <ActionCard icon="🚨" title="Clear Backlogs" desc="Active backlogs are severely dropping your overall projection. Focus heavily on clearing KTs." variant="rose" full />}
               {warnInternals && <ActionCard icon="🎯" title="Maximize Externals" desc="Internal marks are dragging you down. You must score heavily in the external exam." variant="amber" />}
               {warnSyllabus && <ActionCard icon="📚" title="Cover Syllabus" desc="Major syllabus gap detected. Prioritize high-weightage topics from previous year papers." variant="amber" />}
-              {warnStudy && <ActionCard icon="⏱️" title="Track Focus Hours" desc="Self-study time is critically low. Start using RiseOS focus timer for daily sessions." variant="amber" />}
+              {warnStudy && <ActionCard icon="⏱️" title="Track Focus Hours" desc="Self-study time is critically low. Start using Rise focus timer for daily sessions." variant="amber" />}
               {warnStress && <ActionCard icon="🧘‍♂️" title="Manage Stress" desc="High stress levels are negatively impacting your performance and health. Take short breaks and prioritize sleep." variant="rose" />}
               
               {showKeepItUp && (

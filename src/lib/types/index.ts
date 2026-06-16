@@ -1,5 +1,5 @@
 // ============================================================
-// RiseOS - Core Type Definitions
+// Rise - Core Type Definitions
 // ============================================================
 
 export type Profile = {

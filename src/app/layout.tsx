@@ -12,8 +12,8 @@ const nunito = Nunito({
 
 export const metadata: Metadata = {
   title: {
-    default: 'RiseOS — Personal OS for Builders',
-    template: '%s | RiseOS',
+    default: 'Rise — Personal OS for Builders',
+    template: '%s | Rise',
   },
   description: 'Track your career, studies, tasks, and growth.',
   icons: { icon: '/favicon.svg' },

@@ -227,7 +227,7 @@ export default function RoadmapPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `My_RiseOS_Roadmap.md`;
+      a.download = `My_Rise_Roadmap.md`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

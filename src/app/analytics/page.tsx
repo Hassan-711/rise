@@ -233,7 +233,7 @@ export default function AnalyticsPage() {
         <div className="glass-card p-10 border-indigo-200/50 dark:border-indigo-500/20 text-center animate-fade-in relative overflow-hidden">
           <div className="absolute top-0 right-0 p-10 opacity-5 pointer-events-none"><Target className="w-64 h-64" /></div>
           <BarChart3 className="h-16 w-16 mx-auto mb-4 text-indigo-500 opacity-60" />
-          <h3 className="text-2xl font-black tracking-tight text-slate-800 dark:text-slate-100">Start using RiseOS to build data!</h3>
+          <h3 className="text-2xl font-black tracking-tight text-slate-800 dark:text-slate-100">Start using Rise to build data!</h3>
           <p className="text-sm font-bold text-slate-500 mt-2 max-w-md mx-auto">Add tasks, complete Timer sessions, and track subjects. Your real productivity data will visualize here.</p>
         </div>
       )}

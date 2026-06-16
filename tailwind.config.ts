@@ -48,7 +48,7 @@ const config: Config = {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
-        // RiseOS brand colors
+        // Rise brand colors
         rise: {
           50: '#f0f4ff',
           100: '#e0e9ff',

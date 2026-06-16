@@ -1,4 +1,4 @@
-# 🚀 RiseOS: AI-Powered Personal Productivity & Career OS
+# 🚀 Rise: AI-Powered Personal Productivity & Career OS
 
 > A premium full-stack dashboard for tracking your career roadmap, study progress, daily tasks, and analytics. Built for modern engineering students, featuring an integrated Explainable AI (XAI) academic prediction engine.
 
@@ -36,7 +36,7 @@
 ## 📂 Complete Project Structure
 
 ### ```text
-riseos/
+rise/
 ├── src/
 │   ├── app/
 │   │   ├── auth/           # Login, Signup, Forgot Password
@@ -108,22 +108,3 @@ Fill in your Supabase URL, keys, and the ML API endpoint:
     Bash
     npm run dev
 Open http://localhost:3000.
-
-🚀 Roadmap (Future Features)
-[ ] AI-powered daily priority suggestions
-
-[ ] Study material upload to Supabase Storage
-
-[ ] Actual PDF export with Puppeteer/html2canvas
-
-[ ] Mobile app (React Native)
-
-[ ] Calendar integration
-
-[ ] LeetCode progress sync via API
-
-[ ] GitHub activity integration
-
-[ ] Weekly review email digest
-
-Built with ❤️ for the grind. Rise every day.

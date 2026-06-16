@@ -25,7 +25,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             <Zap className="h-5 w-5" />
           </div>
           <div>
-            <span className="text-xl font-bold gradient-text tracking-tight">RiseOS</span>
+            <span className="text-xl font-bold gradient-text tracking-tight">Rise</span>
             <p className="text-[11px] text-muted-foreground -mt-0.5">Personal OS for Builders</p>
           </div>
         </div>
@@ -81,7 +81,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
 
         <p className="relative z-10 text-[11px] text-muted-foreground/50">
-          RiseOS · Personal Productivity & Career OS
+          Rise · Personal Productivity & Career OS
         </p>
       </div>
 
@@ -93,7 +93,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             <div className="flex h-8 w-8 items-center justify-center rounded-xl icon-violet">
               <Zap className="h-4 w-4" />
             </div>
-            <span className="text-base font-bold gradient-text">RiseOS</span>
+            <span className="text-base font-bold gradient-text">Rise</span>
           </div>
           {children}
         </div>

@@ -1,4 +1,4 @@
--- RiseOS Database Schema
+-- Rise Database Schema
 -- Run this in Supabase SQL Editor
 
 -- Enable UUID extension

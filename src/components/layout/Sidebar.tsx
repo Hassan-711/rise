@@ -71,7 +71,7 @@ export function Sidebar({ isOpen, onClose, isMobile }: SidebarProps) {
             <div className="flex h-8 w-8 items-center justify-center rounded-xl icon-violet shadow-sm transition-transform group-hover:scale-105">
               <Zap className="h-4 w-4" />
             </div>
-            <span className="text-[15px] font-bold tracking-tight gradient-text">RiseOS</span>
+            <span className="text-[15px] font-bold tracking-tight gradient-text">Rise</span>
           </Link>
           {isMobile && (
             <button onClick={onClose} className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
